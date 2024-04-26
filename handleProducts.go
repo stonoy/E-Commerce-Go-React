@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/stonoy/E-Commerce-Go-React/internal/database"
 )
@@ -76,4 +77,37 @@ func (cfg *apiConfig) GetAllProducts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respWithJson(w, 200, allProductDbToResp(allProduct))
+}
+
+func (cfg *apiConfig) GetSingleProduct(w http.ResponseWriter, r *http.Request) {
+	// get the url param
+	productIdString := chi.URLParam(r, "productID")
+
+	// parse the id
+	parsedID, err := uuid.Parse(productIdString)
+	if err != nil {
+		respWithError(w, 400, fmt.Sprintf("can not parse cart product id: %v", err))
+		return
+	}
+
+	// get the product
+	theProduct, err := cfg.DB.GetProductById(r.Context(), parsedID)
+	if err != nil {
+		respWithError(w, 400, fmt.Sprintf("error in getting product by id: %v", err))
+		return
+	}
+
+	respWithJson(w, 200, Product{
+		ID:          theProduct.ID,
+		CreatedAt:   theProduct.CreatedAt,
+		UpdatedAt:   theProduct.UpdatedAt,
+		Name:        theProduct.Name,
+		Price:       theProduct.Price,
+		Image:       theProduct.Image,
+		Description: theProduct.Description,
+		Category:    theProduct.Category,
+		Company:     theProduct.Company,
+		Featured:    theProduct.Featured,
+		Shipping:    theProduct.Shipping,
+	})
 }

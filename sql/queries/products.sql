@@ -9,3 +9,4 @@ select * from products;
 -- name: GetProductById :one
 select * from products
 where id = $1;
+
