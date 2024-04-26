@@ -57,6 +57,42 @@ type Cart struct {
 	Userid         uuid.UUID     `json:"userID"`
 }
 
+type Address struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Name      string    `json:"name"`
+	Location  string    `json:"location"`
+	Landmark  string    `json:"landmark"`
+	City      string    `json:"city"`
+	Country   string    `json:"country"`
+	Pin       int32     `json:"pin"`
+	Userid    uuid.UUID `json:"userID"`
+}
+
+type OrderProduct struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Amount    int32     `json:"amount"`
+	Orderid   uuid.UUID `json:"orderID"`
+	Productid uuid.UUID `json:"productID"`
+	Name      string    `json:"name"`
+	Price     int32     `json:"price"`
+	Company   string    `json:"company"`
+	Image     string    `json:"image"`
+}
+
+type Order struct {
+	ID            uuid.UUID
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	Ordertotal    float64
+	Userid        uuid.UUID
+	Address       Address
+	OrderProducts []OrderProduct
+}
+
 func allProductDbToResp(allDbProducts []database.Product) []Product {
 	finalProducts := []Product{}
 	for _, product := range allDbProducts {
@@ -94,4 +130,23 @@ func allCartProductToResp(allDbCartProducts []database.GetFullCartProductByCartI
 		})
 	}
 	return finalCartProducts
+}
+
+func allOrderProductToResp(allDbOrderProducts []database.GetFullOrderProductByOrderIDRow) []OrderProduct {
+	finalOrderProduct := []OrderProduct{}
+	for _, orderProduct := range allDbOrderProducts {
+		finalOrderProduct = append(finalOrderProduct, OrderProduct{
+			ID:        orderProduct.ID,
+			CreatedAt: orderProduct.CreatedAt,
+			UpdatedAt: orderProduct.UpdatedAt,
+			Amount:    orderProduct.Amount,
+			Orderid:   orderProduct.Orderid,
+			Productid: orderProduct.Productid,
+			Name:      orderProduct.Name,
+			Price:     orderProduct.Price,
+			Company:   orderProduct.Company,
+			Image:     orderProduct.Image,
+		})
+	}
+	return finalOrderProduct
 }

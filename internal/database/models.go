@@ -10,6 +10,19 @@ import (
 	"github.com/google/uuid"
 )
 
+type Address struct {
+	ID        uuid.UUID
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	Name      string
+	Location  string
+	Landmark  string
+	City      string
+	Country   string
+	Pin       int32
+	Userid    uuid.UUID
+}
+
 type Cart struct {
 	ID             uuid.UUID
 	CreatedAt      time.Time
@@ -28,6 +41,24 @@ type Cartproduct struct {
 	UpdatedAt time.Time
 	Amount    int32
 	Cartid    uuid.UUID
+	Productid uuid.UUID
+}
+
+type Order struct {
+	ID         uuid.UUID
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	Ordertotal float64
+	Userid     uuid.UUID
+	Addressid  uuid.UUID
+}
+
+type Orderproduct struct {
+	ID        uuid.UUID
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	Amount    int32
+	Orderid   uuid.UUID
 	Productid uuid.UUID
 }
 

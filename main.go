@@ -106,6 +106,10 @@ func main() {
 	apiRouter.Post("/insertcartproduct", apiCfg.checkValidUser(apiCfg.createCartCreateCartProduct))
 	apiRouter.Delete("/deletecart", apiCfg.checkValidUser(apiCfg.deleteCart))
 
+	// order handlers
+	apiRouter.Post("/createorder", apiCfg.checkValidUser(apiCfg.createOrder))
+	apiRouter.Get("/orders", apiCfg.checkValidUser(apiCfg.getAllOrders))
+
 	// cart product handlers
 	apiRouter.Post("/updatecartproduct", apiCfg.checkValidUser(apiCfg.updateCarProduct))
 	apiRouter.Delete("/deletecartproduct/{cartProductID}", apiCfg.checkValidUser(apiCfg.deleteCartProduct))
