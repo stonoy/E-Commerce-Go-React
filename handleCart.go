@@ -70,6 +70,29 @@ func (cfg *apiConfig) createCartCreateCartProduct(w http.ResponseWriter, r *http
 		}
 	}
 
+	// check if the prouct already in cart then delete it
+	// check user has the product in his cart
+	userHasTheProduct, err := cfg.DB.DoesUserHasTheProductInCart(r.Context(), database.DoesUserHasTheProductInCartParams{
+		ID:        user.ID,
+		Productid: parsedProductID,
+	})
+	if err != nil {
+		respWithError(w, 400, fmt.Sprintf("Errr in checking relation between userid and cartproductid: %v", err))
+		return
+	}
+
+	if userHasTheProduct {
+		// delete the cart product
+		err = cfg.DB.DeleteCartProductByCartIdAndProductId(r.Context(), database.DeleteCartProductByCartIdAndProductIdParams{
+			Cartid:    cart.ID,
+			Productid: parsedProductID,
+		})
+		if err != nil {
+			respWithError(w, 400, fmt.Sprintf("Errr in deleting cart product by cart and product id: %v", err))
+			return
+		}
+	}
+
 	// use the cart id and reqObj values to create new cartProduct
 	_, err = cfg.DB.CreateCartProduct(r.Context(), database.CreateCartProductParams{
 		ID:        uuid.New(),
@@ -103,11 +126,32 @@ func (cfg *apiConfig) createCartCreateCartProduct(w http.ResponseWriter, r *http
 }
 
 func (cfg *apiConfig) getCartData(w http.ResponseWriter, r *http.Request, user database.User) {
+	// set empty response
+	type respStruct struct {
+		ID             uuid.UUID     `json:"id"`
+		CreatedAt      time.Time     `json:"created_at"`
+		UpdatedAt      time.Time     `json:"updated_at"`
+		CartItems      []CartProduct `json:"cartItems"`
+		Numitemsincart int32         `json:"numItemsInCart"`
+		Chargetotal    float64       `json:"chargesTotal"`
+		Shipping       int32         `json:"shipping"`
+		Tax            float64       `json:"tax"`
+		Ordertotal     int32         `json:"orderTotal"`
+		Userid         uuid.UUID     `json:"userID"`
+	}
 	// get the cart
 	cart, err := cfg.DB.GetCartByUserId(r.Context(), user.ID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			respWithJson(w, 200, struct{}{})
+			respWithJson(w, 200, respStruct{
+				CartItems:      []CartProduct{},
+				Numitemsincart: 0,
+				Chargetotal:    0.0,
+				Tax:            0.0,
+				Ordertotal:     0,
+				Shipping:       500,
+				Userid:         user.ID,
+			})
 		} else {
 			respWithError(w, 400, fmt.Sprintf("error in getting cart by user id: %v", err))
 		}

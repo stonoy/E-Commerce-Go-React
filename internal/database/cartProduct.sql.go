@@ -58,6 +58,21 @@ func (q *Queries) DeleteCartProduct(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+const deleteCartProductByCartIdAndProductId = `-- name: DeleteCartProductByCartIdAndProductId :exec
+delete from cartProduct
+where cartid = $1 and productid = $2
+`
+
+type DeleteCartProductByCartIdAndProductIdParams struct {
+	Cartid    uuid.UUID
+	Productid uuid.UUID
+}
+
+func (q *Queries) DeleteCartProductByCartIdAndProductId(ctx context.Context, arg DeleteCartProductByCartIdAndProductIdParams) error {
+	_, err := q.db.ExecContext(ctx, deleteCartProductByCartIdAndProductId, arg.Cartid, arg.Productid)
+	return err
+}
+
 const doesUserHasProductInCart = `-- name: DoesUserHasProductInCart :one
 select
  case
@@ -78,6 +93,31 @@ type DoesUserHasProductInCartParams struct {
 
 func (q *Queries) DoesUserHasProductInCart(ctx context.Context, arg DoesUserHasProductInCartParams) (bool, error) {
 	row := q.db.QueryRowContext(ctx, doesUserHasProductInCart, arg.ID, arg.ID_2)
+	var user_cart_product bool
+	err := row.Scan(&user_cart_product)
+	return user_cart_product, err
+}
+
+const doesUserHasTheProductInCart = `-- name: DoesUserHasTheProductInCart :one
+select
+ case
+  when count(*) > 0 then true
+  else false
+end as user_cart_product
+from
+    cartProduct cip
+    join cart c on cip.cartid = c.id
+    join users u on c.userid = u.id
+where u.id = $1 and cip.productID = $2
+`
+
+type DoesUserHasTheProductInCartParams struct {
+	ID        uuid.UUID
+	Productid uuid.UUID
+}
+
+func (q *Queries) DoesUserHasTheProductInCart(ctx context.Context, arg DoesUserHasTheProductInCartParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, doesUserHasTheProductInCart, arg.ID, arg.Productid)
 	var user_cart_product bool
 	err := row.Scan(&user_cart_product)
 	return user_cart_product, err

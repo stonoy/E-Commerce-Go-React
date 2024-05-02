@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 const createProduct = `-- name: CreateProduct :one
@@ -69,6 +70,145 @@ select id, created_at, updated_at, name, price, image, company, description, cat
 
 func (q *Queries) GetAllProducts(ctx context.Context) ([]Product, error) {
 	rows, err := q.db.QueryContext(ctx, getAllProducts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Product
+	for rows.Next() {
+		var i Product
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Name,
+			&i.Price,
+			&i.Image,
+			&i.Company,
+			&i.Description,
+			&i.Category,
+			&i.Featured,
+			&i.Shipping,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCompanyAndCategory = `-- name: GetCompanyAndCategory :many
+select distinct company,category from products
+`
+
+type GetCompanyAndCategoryRow struct {
+	Company  string
+	Category string
+}
+
+func (q *Queries) GetCompanyAndCategory(ctx context.Context) ([]GetCompanyAndCategoryRow, error) {
+	rows, err := q.db.QueryContext(ctx, getCompanyAndCategory)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetCompanyAndCategoryRow
+	for rows.Next() {
+		var i GetCompanyAndCategoryRow
+		if err := rows.Scan(&i.Company, &i.Category); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getFeaturedProducts = `-- name: GetFeaturedProducts :many
+select id, created_at, updated_at, name, price, image, company, description, category, featured, shipping from products
+where featured = true
+`
+
+func (q *Queries) GetFeaturedProducts(ctx context.Context) ([]Product, error) {
+	rows, err := q.db.QueryContext(ctx, getFeaturedProducts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Product
+	for rows.Next() {
+		var i Product
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Name,
+			&i.Price,
+			&i.Image,
+			&i.Company,
+			&i.Description,
+			&i.Category,
+			&i.Featured,
+			&i.Shipping,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getFilteredProducts = `-- name: GetFilteredProducts :many
+SELECT 
+  id, created_at, updated_at, name, price, image, company, description, category, featured, shipping
+FROM 
+  products
+WHERE 
+  (COALESCE(array_length($1::TEXT[], 1), 0) = 0 
+    OR company = ANY($1::TEXT[]))  -- Proper comparison with arrays
+  AND (COALESCE(array_length($2::TEXT[], 1), 0) = 0 
+    OR category = ANY($2::TEXT[]))  -- Correct handling of set-returning functions
+  AND ($3::INT IS NULL OR price < $3::INT)  -- Explicit type casting to INT
+  AND ($4::TEXT IS NULL OR name ILIKE '%' || $4::TEXT || '%')  -- Explicit type for ProductName
+LIMIT $5  -- Define limit for pagination
+OFFSET $6
+`
+
+type GetFilteredProductsParams struct {
+	Column1 []string
+	Column2 []string
+	Column3 int32
+	Column4 string
+	Limit   int32
+	Offset  int32
+}
+
+func (q *Queries) GetFilteredProducts(ctx context.Context, arg GetFilteredProductsParams) ([]Product, error) {
+	rows, err := q.db.QueryContext(ctx, getFilteredProducts,
+		pq.Array(arg.Column1),
+		pq.Array(arg.Column2),
+		arg.Column3,
+		arg.Column4,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}

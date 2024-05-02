@@ -100,6 +100,7 @@ func main() {
 	apiRouter.Post("/createproducts", apiCfg.onlyForAdmin(apiCfg.createProduct))
 	apiRouter.Get("/products", apiCfg.GetAllProducts)
 	apiRouter.Get("/product/{productID}", apiCfg.GetSingleProduct)
+	apiRouter.Get("/productincart/{productID}", apiCfg.checkValidUser(apiCfg.checkUserHasProductInCart))
 
 	// cart handlers
 	apiRouter.Get("/cart", apiCfg.checkValidUser(apiCfg.getCartData))

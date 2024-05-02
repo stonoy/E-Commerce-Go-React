@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/stonoy/E-Commerce-Go-React/internal/database"
@@ -53,4 +54,34 @@ func (cfg *apiConfig) calculateTotal(userID, cartID uuid.UUID, r *http.Request) 
 	}
 
 	return nil
+}
+
+func (cfg *apiConfig) getFilterParams(r *http.Request) ([]string, []string, error) {
+	// get the company and category struct
+	allFilterStruct, err := cfg.DB.GetCompanyAndCategory(r.Context())
+	if err != nil {
+		return nil, nil, errors.New(fmt.Sprintf("error in getting filter: %v", err))
+	}
+
+	// loop through allFilter and get each data slice
+	company := []string{}
+	category := []string{}
+
+	for _, filterStruct := range allFilterStruct {
+		company = append(company, filterStruct.Company)
+		category = append(category, filterStruct.Category)
+	}
+
+	return company, category, nil
+}
+
+func getInt32FromStr(str string) (int32, error) {
+	// Convert the string to an integer
+	val, err := strconv.Atoi(str) // Converts to int
+	if err != nil {
+		return 0, fmt.Errorf("invalid integer format: %v", err)
+	}
+
+	return int32(val), nil
+
 }

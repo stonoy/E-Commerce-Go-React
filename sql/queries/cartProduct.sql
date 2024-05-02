@@ -17,7 +17,7 @@ RETURNING *;
 delete from cartProduct
 where id = $1;
 
--- name: DoesUserHasProductInCart :one
+-- name: DoesUserHasTheProductInCart :one
 select
  case
   when count(*) > 0 then true
@@ -27,7 +27,7 @@ from
     cartProduct cip
     join cart c on cip.cartid = c.id
     join users u on c.userid = u.id
-where u.id = $1 and cip.id = $2;
+where u.id = $1 and cip.productID = $2;
 
 -- name: GetFullCartProductByCartId :many
 select
@@ -40,3 +40,19 @@ select
     cartProduct cp
     join products p on cp.productid = p.id 
   where cp.cartid = $1;
+
+-- name: DoesUserHasProductInCart :one
+select
+ case
+  when count(*) > 0 then true
+  else false
+end as user_cart_product
+from
+    cartProduct cip
+    join cart c on cip.cartid = c.id
+    join users u on c.userid = u.id
+where u.id = $1 and cip.id = $2;
+
+-- name: DeleteCartProductByCartIdAndProductId :exec
+delete from cartProduct
+where cartid = $1 and productid = $2;

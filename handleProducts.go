@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -70,13 +71,87 @@ func (cfg *apiConfig) createProduct(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) GetAllProducts(w http.ResponseWriter, r *http.Request) {
-	allProduct, err := cfg.DB.GetAllProducts(r.Context())
+	// get the query params from url
+	queryParams := r.URL.Query()
+
+	featured := queryParams.Get("featured") == "true"
+	page := queryParams.Get("page")
+	search := queryParams.Get("search")
+	price := queryParams.Get("price")
+
+	companies := queryParams["company"]
+	categories := queryParams["category"]
+
+	log.Printf("page:%v, search:%v, price:%v, company:%v, category:%v", page, search, price, companies, categories)
+
+	pageInt, err := getInt32FromStr(page)
 	if err != nil {
-		respWithError(w, 400, fmt.Sprintf("error in getting all products : %v", err))
+		respWithError(w, 400, fmt.Sprintf("error in converting str -> int32 of page : %v", err))
 		return
 	}
+	var priceInt int32
+	if price != "" {
+		priceInt, err = getInt32FromStr(price)
+		if err != nil {
+			respWithError(w, 400, fmt.Sprintf("error in converting str -> int32 of price : %v", err))
+			return
+		}
+	} else {
+		priceInt = 100000
+	}
 
-	respWithJson(w, 200, allProductDbToResp(allProduct))
+	var limit int32 = 2
+	offset := limit * (pageInt - 1)
+
+	if featured {
+		allFeaturedProduct, err := cfg.DB.GetFeaturedProducts(r.Context())
+		if err != nil {
+			respWithError(w, 400, fmt.Sprintf("error in getting featured products : %v", err))
+			return
+		}
+
+		respWithJson(w, 200, allProductDbToResp(allFeaturedProduct))
+	} else {
+		allProduct, err := cfg.DB.GetFilteredProducts(r.Context(), database.GetFilteredProductsParams{
+			Column1: companies,
+			Column2: categories,
+			Column3: priceInt,
+			Column4: search,
+			Limit:   limit,
+			Offset:  offset,
+		})
+		if err != nil {
+			respWithError(w, 400, fmt.Sprintf("error in getting all products : %v", err))
+			return
+		}
+
+		// get the filter
+		comapny, category, err := cfg.getFilterParams(r)
+		if err != nil {
+			respWithError(w, 400, fmt.Sprintf("%v", err))
+			return
+		}
+
+		type filter struct {
+			Company  []string `json:"company"`
+			Category []string `json:"category"`
+		}
+
+		type data struct {
+			Products []Product `json:"products"`
+			Meta     filter    `json:"meta"`
+		}
+
+		respData := data{
+			Products: allProductDbToResp(allProduct),
+			Meta: filter{
+				Company:  comapny,
+				Category: category,
+			},
+		}
+
+		respWithJson(w, 200, respData)
+	}
 }
 
 func (cfg *apiConfig) GetSingleProduct(w http.ResponseWriter, r *http.Request) {
@@ -109,5 +184,34 @@ func (cfg *apiConfig) GetSingleProduct(w http.ResponseWriter, r *http.Request) {
 		Company:     theProduct.Company,
 		Featured:    theProduct.Featured,
 		Shipping:    theProduct.Shipping,
+	})
+}
+
+func (cfg *apiConfig) checkUserHasProductInCart(w http.ResponseWriter, r *http.Request, user database.User) {
+	// get the url param
+	productIdString := chi.URLParam(r, "productID")
+
+	// parse the id
+	parsedID, err := uuid.Parse(productIdString)
+	if err != nil {
+		respWithError(w, 400, fmt.Sprintf("can not parse cart product id: %v", err))
+		return
+	}
+
+	userHasProductInCart, err := cfg.DB.DoesUserHasTheProductInCart(r.Context(), database.DoesUserHasTheProductInCartParams{
+		ID:        user.ID,
+		Productid: parsedID,
+	})
+	if err != nil {
+		respWithError(w, 400, fmt.Sprintf("error in checking product in cart or not using user and product id: %v", err))
+		return
+	}
+
+	type respStruct struct {
+		ProductInCart bool `json:"product_in_cart"`
+	}
+
+	respWithJson(w, 200, respStruct{
+		ProductInCart: userHasProductInCart,
 	})
 }
