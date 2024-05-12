@@ -32,5 +32,39 @@ WHERE
 LIMIT $5  -- Define limit for pagination
 OFFSET $6;  -- Define offset for pagination
 
+-- name: GetFilteredProductsCount :one
+SELECT 
+  count(*)
+FROM 
+  products
+WHERE 
+  (COALESCE(array_length($1::TEXT[], 1), 0) = 0 
+    OR company = ANY($1::TEXT[]))  -- Proper comparison with arrays
+  AND (COALESCE(array_length($2::TEXT[], 1), 0) = 0 
+    OR category = ANY($2::TEXT[]))  -- Correct handling of set-returning functions
+  AND ($3::INT IS NULL OR price < $3::INT)  -- Explicit type casting to INT
+  AND ($4::TEXT IS NULL OR name ILIKE '%' || $4::TEXT || '%');  -- Explicit type for ProductName
 
 
+-- name: UpdateProduct :one
+update products
+set updated_at = NOW(),
+name = $1,
+price = $2,
+description = $3,
+company = $4,
+category = $5,
+image = $6,
+featured = $7,
+shipping = $8
+where id = $9
+RETURNING *;
+
+-- name: IncrementProductVisitById :exec
+update products
+set updated_at = NOW(),
+visits = visits + 1
+where id = $1;
+
+-- name: GetVisitsOfProducts :many
+select id,name,visits from products;

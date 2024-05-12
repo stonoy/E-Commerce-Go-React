@@ -101,6 +101,48 @@ func (q *Queries) GetNumOfCart(ctx context.Context, userid uuid.UUID) (int64, er
 	return count, err
 }
 
+const getProductCountOfCart = `-- name: GetProductCountOfCart :many
+select
+    p.name,
+    cp.productID,
+    sum(cp.amount) as total_quantity
+from
+ cartProduct cp
+ join products p on cp.productID = p.id
+ group by
+    cp.productID,
+    p.name
+`
+
+type GetProductCountOfCartRow struct {
+	Name          string
+	Productid     uuid.UUID
+	TotalQuantity int64
+}
+
+func (q *Queries) GetProductCountOfCart(ctx context.Context) ([]GetProductCountOfCartRow, error) {
+	rows, err := q.db.QueryContext(ctx, getProductCountOfCart)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetProductCountOfCartRow
+	for rows.Next() {
+		var i GetProductCountOfCartRow
+		if err := rows.Scan(&i.Name, &i.Productid, &i.TotalQuantity); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateCart = `-- name: UpdateCart :one
 update cart
 set updated_at = NOW(),

@@ -3,6 +3,8 @@ package main
 import (
 	// "database/sql"
 	"database/sql"
+	"embed"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -15,6 +17,9 @@ import (
 	// "github.com/pressly/goose/v3/database"
 )
 
+//go:embed dist/*
+var staticFiles embed.FS
+
 type apiConfig struct {
 	fileServerHit int
 	Jwt_Secret    string
@@ -24,14 +29,27 @@ type apiConfig struct {
 func (cfg *apiConfig) countTheHits(fileServer http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		if r.URL.Path == "/app/" {
-			// log.Println(r.URL.Path)
-			// log.Println("---------")
-			cfg.fileServerHit += 1
+		log.Println(r.URL.Path)
+
+		// path := r.URL.Path
+
+		if r.URL.Path != "/assets/index-1O6RLpsd.js" && r.URL.Path != "/assets/index-DNmlkUEj.css" && r.URL.Path != "/assets/banner-wppmk-kt.png" && r.URL.Path != "/vite.svg" {
+			r.URL.Path = "/"
 		}
+
+		log.Printf("modified path : %v", r.URL.Path)
+
+		cfg.fileServerHit++
 
 		fileServer.ServeHTTP(w, r)
 	})
+}
+
+func (cfg *apiConfig) clientHandler() http.Handler {
+	fsys := fs.FS(staticFiles)
+	contentStatic, _ := fs.Sub(fsys, "dist")
+	return cfg.countTheHits(http.FileServer(http.FS(contentStatic)))
+
 }
 
 func main() {
@@ -39,32 +57,41 @@ func main() {
 	// get all the .env variables
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatalf("problem in loading env file : %v", err)
+		log.Printf("warning: assuming default configuration. .env unreadable: %v", err)
 	}
 
 	port := os.Getenv("PORT")
-	db_conn := os.Getenv("DB_CONN")
-	jwt_secret := os.Getenv("JWT_SECRET")
-
-	// enable database connection
-	db, err := sql.Open("postgres", db_conn)
-	if err != nil {
-		log.Fatalf("Error establising db connection : %v", err)
+	if port == "" {
+		log.Fatal("PORT environment variable is not set")
 	}
 
-	//this works
-	dbQueries := database.New(db)
+	jwt_secret := os.Getenv("JWT_SECRET")
+	if jwt_secret == "" {
+		log.Fatal("Jwt Secret environment variable is not set")
+	}
 
-	// this does not work
-	// dbQueries := &database.Queries{db: db}
-
-	// configure apiConfig
 	apiCfg := &apiConfig{
 		fileServerHit: 0,
 		Jwt_Secret:    jwt_secret,
-		DB:            dbQueries, // this works
-		// DB:     dbQueries       , // but this does not work why?
+	}
 
+	// enable database connection
+	db_conn := os.Getenv("DB_CONN")
+	if db_conn == "" {
+		log.Println("DATABASE_URL environment variable is not set")
+		log.Println("Running without CRUD endpoints")
+	} else {
+		db, err := sql.Open("postgres", db_conn)
+		if err != nil {
+			log.Fatalf("Error establising db connection : %v", err)
+		}
+
+		//this works
+		dbQueries := database.New(db)
+
+		// configure apiConfig
+		apiCfg.DB = dbQueries
+		log.Println("connected to database")
 	}
 
 	// creating main router
@@ -82,9 +109,6 @@ func main() {
 		MaxAge:           300, // Maximum value not ignored by any of major browsers
 	}))
 
-	// providing the client
-	mainRouter.Handle("/app/*", apiCfg.countTheHits(http.StripPrefix("/app/", http.FileServer(http.Dir("Go")))))
-
 	// creating another router for api endpoints
 	apiRouter := chi.NewRouter()
 
@@ -98,6 +122,7 @@ func main() {
 
 	// product handlers
 	apiRouter.Post("/createproducts", apiCfg.onlyForAdmin(apiCfg.createProduct))
+	apiRouter.Put("/updateproduct/{productID}", apiCfg.onlyForAdmin(apiCfg.updateProduct))
 	apiRouter.Get("/products", apiCfg.GetAllProducts)
 	apiRouter.Get("/product/{productID}", apiCfg.GetSingleProduct)
 	apiRouter.Get("/productincart/{productID}", apiCfg.checkValidUser(apiCfg.checkUserHasProductInCart))
@@ -115,8 +140,15 @@ func main() {
 	apiRouter.Post("/updatecartproduct", apiCfg.checkValidUser(apiCfg.updateCarProduct))
 	apiRouter.Delete("/deletecartproduct/{cartProductID}", apiCfg.checkValidUser(apiCfg.deleteCartProduct))
 
+	// admin special
+	apiRouter.Get("/adminspecial", apiCfg.onlyForAdmin(apiCfg.adminSpecial))
+	apiRouter.Get("/adminallorders", apiCfg.onlyForAdmin(apiCfg.getOrdersOfAllUsers))
+
 	// mount the router over main router
 	mainRouter.Mount("/api/v1", apiRouter)
+
+	// provides client
+	mainRouter.Handle("/*", apiCfg.clientHandler())
 
 	// get the server struct
 	server := &http.Server{

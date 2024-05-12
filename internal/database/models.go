@@ -74,6 +74,7 @@ type Product struct {
 	Category    string
 	Featured    bool
 	Shipping    bool
+	Visits      int32
 }
 
 type User struct {

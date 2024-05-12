@@ -25,3 +25,15 @@ RETURNING *;
 -- name: DeleteCartByUserId :exec
 delete from cart
 where userID = $1;
+
+-- name: GetProductCountOfCart :many
+select
+    p.name,
+    cp.productID,
+    sum(cp.amount) as total_quantity
+from
+ cartProduct cp
+ join products p on cp.productID = p.id
+ group by
+    cp.productID,
+    p.name;

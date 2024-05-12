@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stonoy/E-Commerce-Go-React/internal/database"
@@ -84,4 +85,40 @@ func getInt32FromStr(str string) (int32, error) {
 
 	return int32(val), nil
 
+}
+
+func getTheDates(timeFilter string) (time.Time, time.Time) {
+	// initialize the dates
+	var startDate, endDate time.Time
+
+	switch timeFilter {
+	case "today":
+		start := time.Now().Truncate(24 * time.Hour)
+		end := start.Add(24 * time.Hour)
+
+		startDate, endDate = start, end
+	case "this_week":
+		weekDay := int(time.Now().Weekday())
+		start := time.Now().AddDate(0, 0, -weekDay)
+		end := time.Now().Add(7 * 24 * time.Hour)
+
+		startDate, endDate = start, end
+	case "this_month":
+		monthDay := time.Now().Day() - 1
+		start := time.Now().AddDate(0, 0, -monthDay)
+		end := start.AddDate(0, 1, 0)
+
+		startDate, endDate = start, end
+	case "this_year":
+		month := int(time.Now().Month())
+		start := time.Now().AddDate(0, -month, 0)
+		end := start.AddDate(1, 0, 0)
+
+		startDate, endDate = start, end
+	default:
+		startDate, endDate = time.Now().AddDate(-10, 0, 0), time.Now()
+
+	}
+
+	return startDate, endDate
 }

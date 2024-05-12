@@ -93,6 +93,18 @@ type Order struct {
 	OrderProducts []OrderProduct
 }
 
+type ProductCount struct {
+	Name          string    `json:"product_name"`
+	ProductID     uuid.UUID `json:"productID"`
+	TotalQuantity int64     `json:"total_quantity"`
+}
+
+type ProductVisits struct {
+	Name   string    `json:"product_name"`
+	ID     uuid.UUID `json:"productID"`
+	Visits int32     `json:"visits"`
+}
+
 func allProductDbToResp(allDbProducts []database.Product) []Product {
 	finalProducts := []Product{}
 	for _, product := range allDbProducts {
@@ -149,4 +161,46 @@ func allOrderProductToResp(allDbOrderProducts []database.GetFullOrderProductByOr
 		})
 	}
 	return finalOrderProduct
+}
+
+func allProductCountCartToResp(allDbProductCount []database.GetProductCountOfCartRow) []ProductCount {
+	final := []ProductCount{}
+
+	for _, dbProductCount := range allDbProductCount {
+		final = append(final, ProductCount{
+			Name:          dbProductCount.Name,
+			ProductID:     dbProductCount.Productid,
+			TotalQuantity: dbProductCount.TotalQuantity,
+		})
+	}
+
+	return final
+}
+
+func allProductCountOrderToResp(allDbProductCount []database.GetProductCountOfOrderRow) []ProductCount {
+	final := []ProductCount{}
+
+	for _, dbProductCount := range allDbProductCount {
+		final = append(final, ProductCount{
+			Name:          dbProductCount.Name,
+			ProductID:     dbProductCount.Productid,
+			TotalQuantity: dbProductCount.TotalQuantity,
+		})
+	}
+
+	return final
+}
+
+func allProductVisitToResp(allDbProductVisits []database.GetVisitsOfProductsRow) []ProductVisits {
+	final := []ProductVisits{}
+
+	for _, dbProductVisits := range allDbProductVisits {
+		final = append(final, ProductVisits{
+			Name:   dbProductVisits.Name,
+			ID:     dbProductVisits.ID,
+			Visits: dbProductVisits.Visits,
+		})
+	}
+
+	return final
 }

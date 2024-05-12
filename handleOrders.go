@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"time"
 
@@ -115,12 +116,32 @@ func (cfg *apiConfig) createOrder(w http.ResponseWriter, r *http.Request, user d
 }
 
 func (cfg *apiConfig) getAllOrders(w http.ResponseWriter, r *http.Request, user database.User) {
+	// get the page in queryparam
+	page := r.URL.Query().Get("page")
+
+	// modify the page
+	pageInt, err := getInt32FromStr(page)
+	if err != nil {
+		respWithError(w, 400, fmt.Sprintf("can not convert page str -> int, %v", err))
+		return
+	}
+
+	// set limit and offset
+	var limit int32 = 1
+	offset := limit * (pageInt - 1)
+
 	// get all orders of the user
-	allOrders, err := cfg.DB.GetAllOrderByUserID(r.Context(), user.ID)
+	allOrders, err := cfg.DB.GetAllOrderByUserID(r.Context(), database.GetAllOrderByUserIDParams{
+		Userid: user.ID,
+		Limit:  limit,
+		Offset: offset,
+	})
 	if err != nil {
 		respWithError(w, 400, fmt.Sprintf("error in getting all orders by user id: %v", err))
 		return
 	}
+
+	// get orders ready...
 
 	// create a empty slice
 	finalOrdersSlice := []Order{}
@@ -168,6 +189,23 @@ func (cfg *apiConfig) getAllOrders(w http.ResponseWriter, r *http.Request, user 
 		finalOrdersSlice = append(finalOrdersSlice, modifiedOrder)
 	}
 
+	// get the total number of orders by user
+	numOfOrders, err := cfg.DB.GetAllOrderCountByUserID(r.Context(), user.ID)
+	if err != nil {
+		respWithError(w, 400, fmt.Sprintf("error in getting count of orders of a user : %v", err))
+		return
+	}
+
+	type respOrder struct {
+		Orders     []Order `json:"orders"`
+		NumOfPages int     `json:"numOfPages"`
+		Page       int     `json:"page"`
+	}
+
 	// send the modified reso model
-	respWithJson(w, 200, finalOrdersSlice)
+	respWithJson(w, 200, respOrder{
+		Orders:     finalOrdersSlice,
+		NumOfPages: int(math.Ceil(float64(numOfOrders) / float64(limit))),
+		Page:       int(pageInt),
+	})
 }

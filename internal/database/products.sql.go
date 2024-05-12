@@ -16,7 +16,7 @@ import (
 const createProduct = `-- name: CreateProduct :one
 insert into products(id, created_at, updated_at, name, price, image, description, category, company, featured, shipping)
 values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-RETURNING id, created_at, updated_at, name, price, image, company, description, category, featured, shipping
+RETURNING id, created_at, updated_at, name, price, image, company, description, category, featured, shipping, visits
 `
 
 type CreateProductParams struct {
@@ -60,12 +60,13 @@ func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (P
 		&i.Category,
 		&i.Featured,
 		&i.Shipping,
+		&i.Visits,
 	)
 	return i, err
 }
 
 const getAllProducts = `-- name: GetAllProducts :many
-select id, created_at, updated_at, name, price, image, company, description, category, featured, shipping from products
+select id, created_at, updated_at, name, price, image, company, description, category, featured, shipping, visits from products
 `
 
 func (q *Queries) GetAllProducts(ctx context.Context) ([]Product, error) {
@@ -89,6 +90,7 @@ func (q *Queries) GetAllProducts(ctx context.Context) ([]Product, error) {
 			&i.Category,
 			&i.Featured,
 			&i.Shipping,
+			&i.Visits,
 		); err != nil {
 			return nil, err
 		}
@@ -136,7 +138,7 @@ func (q *Queries) GetCompanyAndCategory(ctx context.Context) ([]GetCompanyAndCat
 }
 
 const getFeaturedProducts = `-- name: GetFeaturedProducts :many
-select id, created_at, updated_at, name, price, image, company, description, category, featured, shipping from products
+select id, created_at, updated_at, name, price, image, company, description, category, featured, shipping, visits from products
 where featured = true
 `
 
@@ -161,6 +163,7 @@ func (q *Queries) GetFeaturedProducts(ctx context.Context) ([]Product, error) {
 			&i.Category,
 			&i.Featured,
 			&i.Shipping,
+			&i.Visits,
 		); err != nil {
 			return nil, err
 		}
@@ -177,7 +180,7 @@ func (q *Queries) GetFeaturedProducts(ctx context.Context) ([]Product, error) {
 
 const getFilteredProducts = `-- name: GetFilteredProducts :many
 SELECT 
-  id, created_at, updated_at, name, price, image, company, description, category, featured, shipping
+  id, created_at, updated_at, name, price, image, company, description, category, featured, shipping, visits
 FROM 
   products
 WHERE 
@@ -228,6 +231,7 @@ func (q *Queries) GetFilteredProducts(ctx context.Context, arg GetFilteredProduc
 			&i.Category,
 			&i.Featured,
 			&i.Shipping,
+			&i.Visits,
 		); err != nil {
 			return nil, err
 		}
@@ -242,8 +246,43 @@ func (q *Queries) GetFilteredProducts(ctx context.Context, arg GetFilteredProduc
 	return items, nil
 }
 
+const getFilteredProductsCount = `-- name: GetFilteredProductsCount :one
+
+SELECT 
+  count(*)
+FROM 
+  products
+WHERE 
+  (COALESCE(array_length($1::TEXT[], 1), 0) = 0 
+    OR company = ANY($1::TEXT[]))  -- Proper comparison with arrays
+  AND (COALESCE(array_length($2::TEXT[], 1), 0) = 0 
+    OR category = ANY($2::TEXT[]))  -- Correct handling of set-returning functions
+  AND ($3::INT IS NULL OR price < $3::INT)  -- Explicit type casting to INT
+  AND ($4::TEXT IS NULL OR name ILIKE '%' || $4::TEXT || '%')
+`
+
+type GetFilteredProductsCountParams struct {
+	Column1 []string
+	Column2 []string
+	Column3 int32
+	Column4 string
+}
+
+// Define offset for pagination
+func (q *Queries) GetFilteredProductsCount(ctx context.Context, arg GetFilteredProductsCountParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getFilteredProductsCount,
+		pq.Array(arg.Column1),
+		pq.Array(arg.Column2),
+		arg.Column3,
+		arg.Column4,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getProductById = `-- name: GetProductById :one
-select id, created_at, updated_at, name, price, image, company, description, category, featured, shipping from products
+select id, created_at, updated_at, name, price, image, company, description, category, featured, shipping, visits from products
 where id = $1
 `
 
@@ -262,6 +301,112 @@ func (q *Queries) GetProductById(ctx context.Context, id uuid.UUID) (Product, er
 		&i.Category,
 		&i.Featured,
 		&i.Shipping,
+		&i.Visits,
+	)
+	return i, err
+}
+
+const getVisitsOfProducts = `-- name: GetVisitsOfProducts :many
+select id,name,visits from products
+`
+
+type GetVisitsOfProductsRow struct {
+	ID     uuid.UUID
+	Name   string
+	Visits int32
+}
+
+func (q *Queries) GetVisitsOfProducts(ctx context.Context) ([]GetVisitsOfProductsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getVisitsOfProducts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetVisitsOfProductsRow
+	for rows.Next() {
+		var i GetVisitsOfProductsRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.Visits); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const incrementProductVisitById = `-- name: IncrementProductVisitById :exec
+update products
+set updated_at = NOW(),
+visits = visits + 1
+where id = $1
+`
+
+func (q *Queries) IncrementProductVisitById(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, incrementProductVisitById, id)
+	return err
+}
+
+const updateProduct = `-- name: UpdateProduct :one
+
+
+update products
+set updated_at = NOW(),
+name = $1,
+price = $2,
+description = $3,
+company = $4,
+category = $5,
+image = $6,
+featured = $7,
+shipping = $8
+where id = $9
+RETURNING id, created_at, updated_at, name, price, image, company, description, category, featured, shipping, visits
+`
+
+type UpdateProductParams struct {
+	Name        string
+	Price       int32
+	Description string
+	Company     string
+	Category    string
+	Image       string
+	Featured    bool
+	Shipping    bool
+	ID          uuid.UUID
+}
+
+// Explicit type for ProductName
+func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error) {
+	row := q.db.QueryRowContext(ctx, updateProduct,
+		arg.Name,
+		arg.Price,
+		arg.Description,
+		arg.Company,
+		arg.Category,
+		arg.Image,
+		arg.Featured,
+		arg.Shipping,
+		arg.ID,
+	)
+	var i Product
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Name,
+		&i.Price,
+		&i.Image,
+		&i.Company,
+		&i.Description,
+		&i.Category,
+		&i.Featured,
+		&i.Shipping,
+		&i.Visits,
 	)
 	return i, err
 }

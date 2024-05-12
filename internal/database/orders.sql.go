@@ -51,10 +51,18 @@ func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) (Order
 const getAllOrderByUserID = `-- name: GetAllOrderByUserID :many
 select id, created_at, updated_at, ordertotal, userid, addressid from orders
 where userID = $1
+limit $2
+offset $3
 `
 
-func (q *Queries) GetAllOrderByUserID(ctx context.Context, userid uuid.UUID) ([]Order, error) {
-	rows, err := q.db.QueryContext(ctx, getAllOrderByUserID, userid)
+type GetAllOrderByUserIDParams struct {
+	Userid uuid.UUID
+	Limit  int32
+	Offset int32
+}
+
+func (q *Queries) GetAllOrderByUserID(ctx context.Context, arg GetAllOrderByUserIDParams) ([]Order, error) {
+	rows, err := q.db.QueryContext(ctx, getAllOrderByUserID, arg.Userid, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -70,6 +78,126 @@ func (q *Queries) GetAllOrderByUserID(ctx context.Context, userid uuid.UUID) ([]
 			&i.Userid,
 			&i.Addressid,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllOrderCountByUserID = `-- name: GetAllOrderCountByUserID :one
+select count(*) from orders
+where userID = $1
+`
+
+func (q *Queries) GetAllOrderCountByUserID(ctx context.Context, userid uuid.UUID) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getAllOrderCountByUserID, userid)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const getAllOrders = `-- name: GetAllOrders :many
+select id, created_at, updated_at, ordertotal, userid, addressid from orders
+where created_at >= $1 and created_at < $2
+limit $3
+offset $4
+`
+
+type GetAllOrdersParams struct {
+	CreatedAt   time.Time
+	CreatedAt_2 time.Time
+	Limit       int32
+	Offset      int32
+}
+
+func (q *Queries) GetAllOrders(ctx context.Context, arg GetAllOrdersParams) ([]Order, error) {
+	rows, err := q.db.QueryContext(ctx, getAllOrders,
+		arg.CreatedAt,
+		arg.CreatedAt_2,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Order
+	for rows.Next() {
+		var i Order
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Ordertotal,
+			&i.Userid,
+			&i.Addressid,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllOrdersCount = `-- name: GetAllOrdersCount :one
+select count(*) from orders
+where created_at >= $1 and created_at < $2
+`
+
+type GetAllOrdersCountParams struct {
+	CreatedAt   time.Time
+	CreatedAt_2 time.Time
+}
+
+func (q *Queries) GetAllOrdersCount(ctx context.Context, arg GetAllOrdersCountParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getAllOrdersCount, arg.CreatedAt, arg.CreatedAt_2)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const getProductCountOfOrder = `-- name: GetProductCountOfOrder :many
+select
+    p.name,
+    op.productId,
+    sum(op.amount) as total_quantity
+from
+    orderProduct op
+    join products p on op.productID = p.id
+group by
+    op.productID,
+    p.name
+`
+
+type GetProductCountOfOrderRow struct {
+	Name          string
+	Productid     uuid.UUID
+	TotalQuantity int64
+}
+
+func (q *Queries) GetProductCountOfOrder(ctx context.Context) ([]GetProductCountOfOrderRow, error) {
+	rows, err := q.db.QueryContext(ctx, getProductCountOfOrder)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetProductCountOfOrderRow
+	for rows.Next() {
+		var i GetProductCountOfOrderRow
+		if err := rows.Scan(&i.Name, &i.Productid, &i.TotalQuantity); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
