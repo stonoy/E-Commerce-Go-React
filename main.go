@@ -29,15 +29,15 @@ type apiConfig struct {
 func (cfg *apiConfig) countTheHits(fileServer http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		log.Println(r.URL.Path)
+		// log.Println(r.URL.Path)
 
-		// path := r.URL.Path
+		// I want to serve the fileserver root directory for request with any url path except those js,css and png files
 
-		if r.URL.Path != "/assets/index-1O6RLpsd.js" && r.URL.Path != "/assets/index-DNmlkUEj.css" && r.URL.Path != "/assets/banner-wppmk-kt.png" && r.URL.Path != "/vite.svg" {
+		if r.URL.Path != "/assets/index-D17R49aB.js" && r.URL.Path != "/assets/index-D-VjbgZV.css" && r.URL.Path != "/assets/banner-wppmk-kt.png" && r.URL.Path != "/vite.svg" {
 			r.URL.Path = "/"
 		}
 
-		log.Printf("modified path : %v", r.URL.Path)
+		// log.Printf("modified path : %v", r.URL.Path)
 
 		cfg.fileServerHit++
 
@@ -67,7 +67,7 @@ func main() {
 
 	jwt_secret := os.Getenv("JWT_SECRET")
 	if jwt_secret == "" {
-		log.Fatal("Jwt Secret environment variable is not set")
+		log.Println("Jwt Secret environment variable is not set")
 	}
 
 	apiCfg := &apiConfig{
@@ -141,6 +141,7 @@ func main() {
 	apiRouter.Delete("/deletecartproduct/{cartProductID}", apiCfg.checkValidUser(apiCfg.deleteCartProduct))
 
 	// admin special
+	apiRouter.Get("/checkadmin", apiCfg.onlyForAdmin(apiCfg.checkAdmin))
 	apiRouter.Get("/adminspecial", apiCfg.onlyForAdmin(apiCfg.adminSpecial))
 	apiRouter.Get("/adminallorders", apiCfg.onlyForAdmin(apiCfg.getOrdersOfAllUsers))
 
@@ -155,6 +156,8 @@ func main() {
 		Addr:    ":" + port,
 		Handler: mainRouter,
 	}
+
+	log.Printf("Server is listenning on port : %v", port)
 
 	// listen requests forever
 	log.Fatal(server.ListenAndServe())

@@ -148,3 +148,13 @@ func (cfg *apiConfig) adminSpecial(w http.ResponseWriter, r *http.Request) {
 		ProductVisits: allProductVisitToResp(productsVists),
 	})
 }
+
+func (cfg *apiConfig) checkAdmin(w http.ResponseWriter, r *http.Request) {
+	type respStruct struct {
+		Msg string `json:"msg"`
+	}
+
+	respWithJson(w, 200, respStruct{
+		Msg: "Welcome Admin",
+	})
+}
