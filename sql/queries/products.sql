@@ -18,32 +18,27 @@ where id = $1;
 select distinct company,category from products;
 
 -- name: GetFilteredProducts :many
-SELECT 
-  *
-FROM 
-  products
-WHERE 
-  (COALESCE(array_length($1::TEXT[], 1), 0) = 0 
-    OR company = ANY($1::TEXT[]))  -- Proper comparison with arrays
-  AND (COALESCE(array_length($2::TEXT[], 1), 0) = 0 
-    OR category = ANY($2::TEXT[]))  -- Correct handling of set-returning functions
-  AND ($3::INT IS NULL OR price < $3::INT)  -- Explicit type casting to INT
-  AND ($4::TEXT IS NULL OR name ILIKE '%' || $4::TEXT || '%')  -- Explicit type for ProductName
-LIMIT $5  -- Define limit for pagination
-OFFSET $6;  -- Define offset for pagination
+select * from products
+where (name like $1)
+and (price < $2)
+and (company = any($3::text[]))
+and (category = any($4::text[]))
+limit $5
+offset $6;
 
 -- name: GetFilteredProductsCount :one
-SELECT 
-  count(*)
-FROM 
-  products
-WHERE 
-  (COALESCE(array_length($1::TEXT[], 1), 0) = 0 
-    OR company = ANY($1::TEXT[]))  -- Proper comparison with arrays
-  AND (COALESCE(array_length($2::TEXT[], 1), 0) = 0 
-    OR category = ANY($2::TEXT[]))  -- Correct handling of set-returning functions
-  AND ($3::INT IS NULL OR price < $3::INT)  -- Explicit type casting to INT
-  AND ($4::TEXT IS NULL OR name ILIKE '%' || $4::TEXT || '%');  -- Explicit type for ProductName
+select count(*) from products
+where (name like $1)
+and (price < $2)
+and (company = any($3::text[]))
+and (category = any($4::text[]));
+
+-- name: GetFilteredProductsComanyandCategory :many
+select distinct company,category from products
+where (name like $1)
+and (price < $2)
+and (company = any($3::text[]))
+and (category = any($4::text[]));
 
 
 -- name: UpdateProduct :one
@@ -68,3 +63,4 @@ where id = $1;
 
 -- name: GetVisitsOfProducts :many
 select id,name,visits from products;
+

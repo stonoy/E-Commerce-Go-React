@@ -57,12 +57,7 @@ func (cfg *apiConfig) calculateTotal(userID, cartID uuid.UUID, r *http.Request) 
 	return nil
 }
 
-func (cfg *apiConfig) getFilterParams(r *http.Request) ([]string, []string, error) {
-	// get the company and category struct
-	allFilterStruct, err := cfg.DB.GetCompanyAndCategory(r.Context())
-	if err != nil {
-		return nil, nil, errors.New(fmt.Sprintf("error in getting filter: %v", err))
-	}
+func (cfg *apiConfig) getFilterParams(allFilterStruct []database.GetCompanyAndCategoryRow) ([]string, []string) {
 
 	// loop through allFilter and get each data slice
 	company := []string{}
@@ -73,7 +68,21 @@ func (cfg *apiConfig) getFilterParams(r *http.Request) ([]string, []string, erro
 		category = append(category, filterStruct.Category)
 	}
 
-	return company, category, nil
+	return company, category
+}
+
+func (cfg *apiConfig) getFilterParamsAfter(afterFilterStruct []database.GetFilteredProductsComanyandCategoryRow) ([]string, []string) {
+
+	// loop through allFilter and get each data slice
+	company := []string{}
+	category := []string{}
+
+	for _, filterStruct := range afterFilterStruct {
+		company = append(company, filterStruct.Company)
+		category = append(category, filterStruct.Category)
+	}
+
+	return company, category
 }
 
 func getInt32FromStr(str string) (int32, error) {

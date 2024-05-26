@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
@@ -29,17 +30,12 @@ type apiConfig struct {
 func (cfg *apiConfig) countTheHits(fileServer http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		// log.Println(r.URL.Path)
-
 		// I want to serve the fileserver root directory for request with any url path except those js,css and png files
 
-		if r.URL.Path != "/assets/index-D17R49aB.js" && r.URL.Path != "/assets/index-D-VjbgZV.css" && r.URL.Path != "/assets/banner-wppmk-kt.png" && r.URL.Path != "/vite.svg" {
+		if strings.HasSuffix(r.URL.Path, ".js") && strings.HasSuffix(r.URL.Path, ".css") && strings.HasSuffix(r.URL.Path, ".png") && strings.HasSuffix(r.URL.Path, ".svg") {
 			r.URL.Path = "/"
+			cfg.fileServerHit++
 		}
-
-		// log.Printf("modified path : %v", r.URL.Path)
-
-		cfg.fileServerHit++
 
 		fileServer.ServeHTTP(w, r)
 	})
@@ -86,7 +82,6 @@ func main() {
 			log.Fatalf("Error establising db connection : %v", err)
 		}
 
-		//this works
 		dbQueries := database.New(db)
 
 		// configure apiConfig

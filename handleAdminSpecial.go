@@ -151,10 +151,12 @@ func (cfg *apiConfig) adminSpecial(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) checkAdmin(w http.ResponseWriter, r *http.Request) {
 	type respStruct struct {
-		Msg string `json:"msg"`
+		Msg    string `json:"msg"`
+		Visits int    `json:"visits"`
 	}
 
 	respWithJson(w, 200, respStruct{
-		Msg: "Welcome Admin",
+		Msg:    "Welcome Admin",
+		Visits: cfg.fileServerHit,
 	})
 }

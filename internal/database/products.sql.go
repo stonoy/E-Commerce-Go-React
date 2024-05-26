@@ -179,36 +179,30 @@ func (q *Queries) GetFeaturedProducts(ctx context.Context) ([]Product, error) {
 }
 
 const getFilteredProducts = `-- name: GetFilteredProducts :many
-SELECT 
-  id, created_at, updated_at, name, price, image, company, description, category, featured, shipping, visits
-FROM 
-  products
-WHERE 
-  (COALESCE(array_length($1::TEXT[], 1), 0) = 0 
-    OR company = ANY($1::TEXT[]))  -- Proper comparison with arrays
-  AND (COALESCE(array_length($2::TEXT[], 1), 0) = 0 
-    OR category = ANY($2::TEXT[]))  -- Correct handling of set-returning functions
-  AND ($3::INT IS NULL OR price < $3::INT)  -- Explicit type casting to INT
-  AND ($4::TEXT IS NULL OR name ILIKE '%' || $4::TEXT || '%')  -- Explicit type for ProductName
-LIMIT $5  -- Define limit for pagination
-OFFSET $6
+select id, created_at, updated_at, name, price, image, company, description, category, featured, shipping, visits from products
+where (name like $1)
+and (price < $2)
+and (company = any($3::text[]))
+and (category = any($4::text[]))
+limit $5
+offset $6
 `
 
 type GetFilteredProductsParams struct {
-	Column1 []string
-	Column2 []string
-	Column3 int32
-	Column4 string
+	Name    string
+	Price   int32
+	Column3 []string
+	Column4 []string
 	Limit   int32
 	Offset  int32
 }
 
 func (q *Queries) GetFilteredProducts(ctx context.Context, arg GetFilteredProductsParams) ([]Product, error) {
 	rows, err := q.db.QueryContext(ctx, getFilteredProducts,
-		pq.Array(arg.Column1),
-		pq.Array(arg.Column2),
-		arg.Column3,
-		arg.Column4,
+		arg.Name,
+		arg.Price,
+		pq.Array(arg.Column3),
+		pq.Array(arg.Column4),
 		arg.Limit,
 		arg.Offset,
 	)
@@ -246,35 +240,75 @@ func (q *Queries) GetFilteredProducts(ctx context.Context, arg GetFilteredProduc
 	return items, nil
 }
 
-const getFilteredProductsCount = `-- name: GetFilteredProductsCount :one
+const getFilteredProductsComanyandCategory = `-- name: GetFilteredProductsComanyandCategory :many
+select distinct company,category from products
+where (name like $1)
+and (price < $2)
+and (company = any($3::text[]))
+and (category = any($4::text[]))
+`
 
-SELECT 
-  count(*)
-FROM 
-  products
-WHERE 
-  (COALESCE(array_length($1::TEXT[], 1), 0) = 0 
-    OR company = ANY($1::TEXT[]))  -- Proper comparison with arrays
-  AND (COALESCE(array_length($2::TEXT[], 1), 0) = 0 
-    OR category = ANY($2::TEXT[]))  -- Correct handling of set-returning functions
-  AND ($3::INT IS NULL OR price < $3::INT)  -- Explicit type casting to INT
-  AND ($4::TEXT IS NULL OR name ILIKE '%' || $4::TEXT || '%')
+type GetFilteredProductsComanyandCategoryParams struct {
+	Name    string
+	Price   int32
+	Column3 []string
+	Column4 []string
+}
+
+type GetFilteredProductsComanyandCategoryRow struct {
+	Company  string
+	Category string
+}
+
+func (q *Queries) GetFilteredProductsComanyandCategory(ctx context.Context, arg GetFilteredProductsComanyandCategoryParams) ([]GetFilteredProductsComanyandCategoryRow, error) {
+	rows, err := q.db.QueryContext(ctx, getFilteredProductsComanyandCategory,
+		arg.Name,
+		arg.Price,
+		pq.Array(arg.Column3),
+		pq.Array(arg.Column4),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetFilteredProductsComanyandCategoryRow
+	for rows.Next() {
+		var i GetFilteredProductsComanyandCategoryRow
+		if err := rows.Scan(&i.Company, &i.Category); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getFilteredProductsCount = `-- name: GetFilteredProductsCount :one
+select count(*) from products
+where (name like $1)
+and (price < $2)
+and (company = any($3::text[]))
+and (category = any($4::text[]))
 `
 
 type GetFilteredProductsCountParams struct {
-	Column1 []string
-	Column2 []string
-	Column3 int32
-	Column4 string
+	Name    string
+	Price   int32
+	Column3 []string
+	Column4 []string
 }
 
-// Define offset for pagination
 func (q *Queries) GetFilteredProductsCount(ctx context.Context, arg GetFilteredProductsCountParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, getFilteredProductsCount,
-		pq.Array(arg.Column1),
-		pq.Array(arg.Column2),
-		arg.Column3,
-		arg.Column4,
+		arg.Name,
+		arg.Price,
+		pq.Array(arg.Column3),
+		pq.Array(arg.Column4),
 	)
 	var count int64
 	err := row.Scan(&count)
@@ -352,8 +386,6 @@ func (q *Queries) IncrementProductVisitById(ctx context.Context, id uuid.UUID) e
 }
 
 const updateProduct = `-- name: UpdateProduct :one
-
-
 update products
 set updated_at = NOW(),
 name = $1,
@@ -380,7 +412,6 @@ type UpdateProductParams struct {
 	ID          uuid.UUID
 }
 
-// Explicit type for ProductName
 func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error) {
 	row := q.db.QueryRowContext(ctx, updateProduct,
 		arg.Name,

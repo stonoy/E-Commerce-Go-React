@@ -71,6 +71,7 @@ func (cfg *apiConfig) createProduct(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) GetAllProducts(w http.ResponseWriter, r *http.Request) {
+	// provide all products without any page or filter for admin
 	// get the request url
 	url := r.URL.String()
 	if url == "/api/v1/products" {
@@ -98,41 +99,80 @@ func (cfg *apiConfig) GetAllProducts(w http.ResponseWriter, r *http.Request) {
 
 		respWithJson(w, 200, allProductDbToResp(allFeaturedProduct))
 	} else {
+		allFilterStruct, err := cfg.DB.GetCompanyAndCategory(r.Context())
+		if err != nil {
+			respWithError(w, 400, fmt.Sprintf("error in getting distinct company and category %v", err))
+			return
+		}
+
+		// get the distinct company and category
+		comapny, category := cfg.getFilterParams(allFilterStruct)
+
+		type filterStruct struct {
+			page       int32
+			search     string
+			price      int32
+			companies  []string
+			categories []string
+		}
+
+		filterObj := filterStruct{
+			page:       1,
+			search:     "%%",
+			price:      100000,
+			companies:  comapny,
+			categories: category,
+		}
+
 		// take the query params
 		page := queryParams.Get("page")
 		search := queryParams.Get("search")
 		price := queryParams.Get("price")
-
-		var priceInt int32 = 100000
 
 		companies := queryParams["company"]
 		categories := queryParams["category"]
 
 		// log.Printf("page:%v, search:%v, price:%v, company:%v, category:%v", page, search, price, companies, categories)
 
-		pageInt, err := getInt32FromStr(page)
-		if err != nil {
-			respWithError(w, 400, fmt.Sprintf("error in converting str -> int32 of page : %v", err))
-			return
+		if page != "" {
+			pageInt, err := getInt32FromStr(page)
+			if err != nil {
+				respWithError(w, 400, fmt.Sprintf("error in converting str -> int32 of page : %v", err))
+				return
+			}
+			filterObj.page = pageInt
+		}
+
+		if search != "" {
+			filterObj.search = "%" + search + "%"
 		}
 
 		if price != "" {
-			priceInt, err = getInt32FromStr(price)
+			priceInt, err := getInt32FromStr(price)
 			if err != nil {
 				respWithError(w, 400, fmt.Sprintf("error in converting str -> int32 of price : %v", err))
 				return
 			}
+			filterObj.price = priceInt
+		}
+
+		if len(companies) > 0 {
+			filterObj.companies = companies
+		}
+
+		if len(categories) > 0 {
+			filterObj.categories = categories
 		}
 
 		var limit int32 = 2
-		offset := limit * (pageInt - 1) // where to start
+		offset := limit * (filterObj.page - 1) // where to start
 
 		// get the filtered products
 		allProduct, err := cfg.DB.GetFilteredProducts(r.Context(), database.GetFilteredProductsParams{
-			Column1: companies,
-			Column2: categories,
-			Column3: priceInt,
-			Column4: search,
+			Name:    filterObj.search,
+			Price:   filterObj.price,
+			Column3: filterObj.companies,
+			Column4: filterObj.categories,
 			Limit:   limit,
 			Offset:  offset,
 		})
@@ -143,22 +183,30 @@ func (cfg *apiConfig) GetAllProducts(w http.ResponseWriter, r *http.Request) {
 
 		// get the num of filtered products
 		numOfProducts, err := cfg.DB.GetFilteredProductsCount(r.Context(), database.GetFilteredProductsCountParams{
-			Column1: companies,
-			Column2: categories,
-			Column3: priceInt,
-			Column4: search,
+			Name:    filterObj.search,
+			Price:   filterObj.price,
+			Column3: filterObj.companies,
+			Column4: filterObj.categories,
 		})
 		if err != nil {
 			respWithError(w, 400, fmt.Sprintf("error in getting count of filtered products : %v", err))
 			return
 		}
 
-		// get the filter
-		comapny, category, err := cfg.getFilterParams(r)
-		if err != nil {
-			respWithError(w, 400, fmt.Sprintf("%v", err))
-			return
-		}
+		// // get the company and category struct
+		// afterFilterStruct, err := cfg.DB.GetFilteredProductsComanyandCategory(r.Context(), database.GetFilteredProductsComanyandCategoryParams{
+		// 	Name:    filterObj.search,
+		// 	Price:   filterObj.price,
+		// 	Column3: filterObj.companies,
+		// 	Column4: filterObj.categories,
+		// })
+		// if err != nil {
+		// 	respWithError(w, 400, fmt.Sprintf("error in getting distinct company and category after filter %v", err))
+		// 	return
+		// }
+
+		// // get filtered company and category
+		// comapnyFiltered, categoryFiltered := cfg.getFilterParamsAfter(afterFilterStruct)
 
 		// get the number of pages
 		numOfPages := int(math.Ceil(float64(numOfProducts) / float64(limit)))
@@ -181,7 +229,7 @@ func (cfg *apiConfig) GetAllProducts(w http.ResponseWriter, r *http.Request) {
 				Company:    comapny,
 				Category:   category,
 				NumOfPages: numOfPages,
-				Page:       int(pageInt),
+				Page:       int(filterObj.page),
 			},
 		}
 
@@ -321,3 +369,153 @@ func (cfg *apiConfig) updateProduct(w http.ResponseWriter, r *http.Request) {
 		Shipping:    product.Shipping,
 	})
 }
+
+// extra
+
+// func (cfg *apiConfig) GetAllProducts(w http.ResponseWriter, r *http.Request) {
+// 	// get the request url
+// 	url := r.URL.String()
+// 	if url == "/api/v1/products" {
+// 		allProducts, err := cfg.DB.GetAllProducts(r.Context())
+// 		if err != nil {
+// 			respWithError(w, 400, fmt.Sprintf("error in getting all products : %v", err))
+// 			return
+// 		}
+
+// 		respWithJson(w, 200, allProductDbToResp(allProducts))
+// 		return
+// 	}
+
+// 	// get the query params from url
+// 	queryParams := r.URL.Query()
+
+// 	featured := queryParams.Get("featured") == "true"
+
+// 	if featured {
+// 		allFeaturedProduct, err := cfg.DB.GetFeaturedProducts(r.Context())
+// 		if err != nil {
+// 			respWithError(w, 400, fmt.Sprintf("error in getting featured products : %v", err))
+// 			return
+// 		}
+
+// 		respWithJson(w, 200, allProductDbToResp(allFeaturedProduct))
+// 	} else {
+// 		// take the query params
+// 		page := queryParams.Get("page")
+// 		search := queryParams.Get("search")
+// 		price := queryParams.Get("price")
+
+// 		var priceInt int32 = 100000
+
+// 		companies := queryParams["company"]
+// 		categories := queryParams["category"]
+
+// 		// log.Printf("page:%v, search:%v, price:%v, company:%v, category:%v", page, search, price, companies, categories)
+
+// 		pageInt, err := getInt32FromStr(page)
+// 		if err != nil {
+// 			respWithError(w, 400, fmt.Sprintf("error in converting str -> int32 of page : %v", err))
+// 			return
+// 		}
+
+// 		if price != "" {
+// 			priceInt, err = getInt32FromStr(price)
+// 			if err != nil {
+// 				respWithError(w, 400, fmt.Sprintf("error in converting str -> int32 of price : %v", err))
+// 				return
+// 			}
+// 		}
+
+// 		var limit int32 = 2
+// 		offset := limit * (pageInt - 1) // where to start
+
+// 		// get the filtered products
+// 		allProduct, err := cfg.DB.GetFilteredProducts(r.Context(), database.GetFilteredProductsParams{
+// 			Column1: companies,
+// 			Column2: categories,
+// 			Column3: priceInt,
+// 			Column4: search,
+// 			Limit:   limit,
+// 			Offset:  offset,
+// 		})
+// 		if err != nil {
+// 			respWithError(w, 400, fmt.Sprintf("error in getting filtered products : %v", err))
+// 			return
+// 		}
+
+// 		// get the num of filtered products
+// 		numOfProducts, err := cfg.DB.GetFilteredProductsCount(r.Context(), database.GetFilteredProductsCountParams{
+// 			Column1: companies,
+// 			Column2: categories,
+// 			Column3: priceInt,
+// 			Column4: search,
+// 		})
+// 		if err != nil {
+// 			respWithError(w, 400, fmt.Sprintf("error in getting count of filtered products : %v", err))
+// 			return
+// 		}
+
+// 		// get the filter
+// 		comapny, category, err := cfg.getFilterParams(r)
+// 		if err != nil {
+// 			respWithError(w, 400, fmt.Sprintf("%v", err))
+// 			return
+// 		}
+
+// 		// get the number of pages
+// 		numOfPages := int(math.Ceil(float64(numOfProducts) / float64(limit)))
+
+// 		type filter struct {
+// 			Company    []string `json:"company"`
+// 			Category   []string `json:"category"`
+// 			NumOfPages int      `json:"numOfPages"`
+// 			Page       int      `json:"page"`
+// 		}
+
+// 		type data struct {
+// 			Products []Product `json:"products"`
+// 			Meta     filter    `json:"meta"`
+// 		}
+
+// 		respData := data{
+// 			Products: allProductDbToResp(allProduct),
+// 			Meta: filter{
+// 				Company:    comapny,
+// 				Category:   category,
+// 				NumOfPages: numOfPages,
+// 				Page:       int(pageInt),
+// 			},
+// 		}
+
+// 		respWithJson(w, 200, respData)
+// 	}
+// }
+
+// its related sql query
+// -- name: GetFilteredProducts :many
+// SELECT
+//   *
+// FROM
+//   products
+// WHERE
+//   (COALESCE(array_length($1::TEXT[], 1), 0) = 0
+//     OR company = ANY($1::TEXT[]))  -- Proper comparison with arrays
+//   AND (COALESCE(array_length($2::TEXT[], 1), 0) = 0
+//     OR category = ANY($2::TEXT[]))  -- Correct handling of set-returning functions
+//   AND ($3::INT IS NULL OR price < $3::INT)  -- Explicit type casting to INT
+//   AND ($4::TEXT IS NULL OR name ILIKE '%' || $4::TEXT || '%')  -- Explicit type for ProductName
+// LIMIT $5  -- Define limit for pagination
+// OFFSET $6;  -- Define offset for pagination
+
+// -- name: GetFilteredProductsCount :one
+// SELECT
+//   count(*)
+// FROM
+//   products
+// WHERE
+//   (COALESCE(array_length($1::TEXT[], 1), 0) = 0
+//     OR company = ANY($1::TEXT[]))  -- Proper comparison with arrays
+//   AND (COALESCE(array_length($2::TEXT[], 1), 0) = 0
+//     OR category = ANY($2::TEXT[]))  -- Correct handling of set-returning functions
+//   AND ($3::INT IS NULL OR price < $3::INT)  -- Explicit type casting to INT
+//   AND ($4::TEXT IS NULL OR name ILIKE '%' || $4::TEXT || '%');  -- Explicit type for ProductName
