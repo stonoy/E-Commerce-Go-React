@@ -32,7 +32,7 @@ func (cfg *apiConfig) countTheHits(fileServer http.Handler) http.Handler {
 
 		// I want to serve the fileserver root directory for request with any url path except those js,css and png files
 
-		if strings.HasSuffix(r.URL.Path, ".js") && strings.HasSuffix(r.URL.Path, ".css") && strings.HasSuffix(r.URL.Path, ".png") && strings.HasSuffix(r.URL.Path, ".svg") {
+		if !strings.HasSuffix(r.URL.Path, ".js") && !strings.HasSuffix(r.URL.Path, ".css") && !strings.HasSuffix(r.URL.Path, ".png") && !strings.HasSuffix(r.URL.Path, ".svg") {
 			r.URL.Path = "/"
 			cfg.fileServerHit++
 		}
