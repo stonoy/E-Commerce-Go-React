@@ -35,30 +35,29 @@ Welcome to the E-Commerce Site repository! This project is an e-commerce web app
 ```bash
 git clone https://github.com/your-username/ecommerce-site.git
 
-### Navigate to the backend directory and install dependencies
+2. Navigate to the backend directory and install dependencies
 
 - cd root
 - go mod tidy
 
-### Set up the database by applying migrations
+3. Set up the database by applying migrations
 - goose postgres <database-connection-string> up
 
-### Navigate to the frontend directory and install dependencies
+4. Navigate to the frontend directory and install dependencies
 
 - cd client
 - npm install
 
-### Start the frontend
+5. Start the frontend
 
 - npm run dev
 
-### Build the frontend and copy the dist to root directory
+6. Build the frontend and copy the dist to root directory
 
 - npm run build
 
-### Build and start the server
+7. Build and start the server
 
 - go build -o exam1 && ./exam1
 
-## 
-Feel free to customize it further according to your project's specifics and requirements.
+# Feel free to customize it further according to your project's specifics and requirements.
