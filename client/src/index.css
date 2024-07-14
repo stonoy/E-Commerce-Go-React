@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Font */
+body {
+    font-family: 'Roboto', sans-serif; /* You can replace 'Roboto' with your preferred font */
+  }
+
+  @layer components {
+    .align-element {
+      @apply mx-auto max-w-6xl px-8;
+    }
+  }
+  
+  /* Color Palette */
+  :root {
+    --color-primary: #4f46e5; /* Primary color */
+    --color-secondary: #6b7280; /* Secondary color */
+    --color-accent: #22d3ee; /* Accent color */
+    --color-text: #1f2937; /* Text color */
+    --color-white: #ffffff; /* White color */
+    --color-gray: #f3f4f6; /* Gray color */
+  }
+
+  /* Colors in the Project */
+  /* outer-background -> bg-gray-100
+  inner-background -> bg-white
+  normal-font ->text-sm text-gray-700
+  bold-font -> font-extrabold text-3xl text-gray-900
+  button -> text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 */
+
+
