@@ -28,7 +28,7 @@ Welcome to the E-Commerce Site repository! This project is an e-commerce web app
 - Node.js (16.x or later)
 - PostgreSQL
 
-### Backend Setup
+### Quick StartUp
 
 1. Clone the repository:
 
