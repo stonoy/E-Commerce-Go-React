@@ -32,7 +32,7 @@ Welcome to the E-Commerce Site repository! This project is an e-commerce web app
 
 1. Clone the repository:
 
-- bash : git clone https://github.com/your-username/ecommerce-site.git
+- bash : git clone https://github.com/stonoy/E-Commerce-Go-React.git
 
 2. Navigate to the backend directory and install dependencies
 
